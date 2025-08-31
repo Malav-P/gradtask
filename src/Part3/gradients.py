@@ -30,7 +30,7 @@ def compute_distances(states_x,
                       states_y,
                       compute_grad=True,
                       compute_squared=False,
-                      only_use_positions=True,
+                      only_use="position",
                       eps=1e-4):
     """
     Compute pairwise distances of x to y. Optionally, return the gradient w.r.t. x
@@ -40,16 +40,26 @@ def compute_distances(states_x,
         states_y (np.ndarray): array of shape (M, T, 6) representing states of y
         compute_grad (bool): Whether or not to return the gradient, default True
         compute_squared (bool): Whether or not to return squared distances instead of just distance. Default False
-        only_use_positions (bool): Whether or not to use the position vector only when computing distances (as opposed to full state vector). Default True
+        only_use (bool): One of `position`, `velocity`, or `None`. If `None`, entire state is used. If `position`, only position is used. If `velocity`, only velocity is used. Default `position`
         eps (float) : divide by zero prevention. Default 1e-4
 
     Returns:
         dist (np.ndarray): array of shape (T, N, M). dist[i, j, k] is the distance from object j to object k at time i
-        grad (np.ndarray): array of shape (T, N, M, 3) if only_use_positions is True otherwise (T, N, M, 6) of the gradients w.r.t x
+        grad (np.ndarray): array of shape (T, N, M, 3) if only_use is True otherwise (T, N, M, 6) of the gradients w.r.t x
     """
-    x = states_x[..., :3] if only_use_positions else states_x
-    y = states_y[..., :3] if only_use_positions else states_y
-
+    match only_use:
+        case "position":
+            x = states_x[..., :3]
+            y = states_y[..., :3]
+        case "velocity": 
+            x = states_x[..., 3:]
+            y = states_y[..., 3:]
+        case None:
+            x = states_x
+            y = states_y
+        case _:
+            raise ValueError("only_use must be one of 'position', 'velocity', or None")
+        
     x_squared = (x**2).sum(axis=-1).T # (T, N)
     y_squared = (y**2).sum(axis=-1).T # (T, M)
     xy    = np.einsum('ntk,mtk->tnm', x, y) # (T, N, M)
