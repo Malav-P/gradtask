@@ -76,6 +76,44 @@ def compute_distances(states_x,
 
     return dist, grad
 
+def compute_generalized_distances(states_x,
+                                  states_y,
+                                  Q,
+                                  compute_grad=True,
+                                  compute_squared=False,
+                                  eps=1e-4):
+    
+    """
+    Compute pairwise generalized distances of x to y of the form (x-y)^T Q (x-y) where Q is a diagonal matrix. Optionally, return the gradient w.r.t. x
+
+    Args:
+        states_x (np.ndarray): array of shape (N, T, 6) representing states of x 
+        states_y (np.ndarray): array of shape (M, T, 6) representing states of y
+        Q (np.ndarray): array of shape (6,) representing the diagonal of the matrix Q
+        compute_grad (bool): Whether or not to return the gradient, default True
+        compute_squared (bool): Whether or not to return squared distances instead of just distance. Default False
+        eps (float) : divide by zero prevention. Default 1e-4 
+    Returns:
+        dist (np.ndarray): array of shape (T, N, M). dist[i, j, k] is the distance from object j to object k at time i
+        grad (np.ndarray): array of shape (T, N, M, 6) of the gradients w.r.t x
+    """
+
+    xQx = (Q * (states_x**2)).sum(axis=-1).T # (T, N)
+    yQy = (Q * (states_y**2)).sum(axis=-1).T # (T, M)
+    xQy = np.einsum('k,ntk,mtk->tnm', Q, states_x, states_y) # (T, N, M)
+
+    l = xQx[..., None] + yQy[:, None, :] - 2*xQy
+    dist = np.sqrt(l) if compute_squared else l
+
+    if compute_grad:
+        dldx = 2 * Q[None, None, None, :] * (states_x[:, None, ...] - states_y[None, :, ...]) # (N, M, T, 6)
+        dldx = dldx.transpose((2, 0, 1, 3)) # (T, N, M, 6)
+        grad = dldx if compute_squared else (1 / (2 * np.sqrt(l+eps)))[..., None] * dldx 
+    else:
+        grad = None 
+
+    return dist, grad
+
 def compute_projected_gradients(gradients, states, reduction='sum'):
     """
     Compute the projected gradient of each satellite along its orbit.
