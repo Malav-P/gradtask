@@ -4,8 +4,9 @@
 
 from src.Part3.assignment_problem import solve_assignment_problem
 from src.Part3.dynamics import gen_state_history, build_taylor_cr3bp
-from src.Part3.gradients import select_gradients, compute_distances, compute_projected_gradients
+from src.Part3.gradients import select_gradients, compute_generalized_distances, compute_projected_gradients
 from src.Part3.optimizers import SGD
+from src.Part3.constants import CR3BP_MU
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -59,10 +60,8 @@ def plot_configuration(states_x, states_y, projection="xy"):
 
 
 if __name__ == "__main__":
-
-    mu = 1.215058560962404e-02
     
-    ta = build_taylor_cr3bp(mu=mu, stm=False)
+    ta = build_taylor_cr3bp(mu=CR3BP_MU, stm=False)
     initial_state = np.array([
                     1.1540242813087864,
                     0.0,
@@ -123,8 +122,9 @@ if __name__ == "__main__":
             # plot_configuration(states_x, states_y)
             # break
 
+            Q = np.array([1, 1, 1, 0, 0, 0])
 
-            dist, grad = compute_distances(states_x=states_x, states_y=states_y, compute_grad=True, compute_squared=False)  # (n_points, 2, 2) , (n_points, 2, 2, 3)
+            dist, grad = compute_generalized_distances(states_x=states_x, states_y=states_y, Q=Q, compute_grad=True)  # (n_points, 2, 2) , (n_points, 2, 2, 3)
 
             x = np.zeros_like(dist)
             obj = 0

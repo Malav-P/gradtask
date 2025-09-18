@@ -1,4 +1,10 @@
 import numpy as np
+from .dynamics import cr3bp_vec
+from .constants import CR3BP_MU
+
+import jax
+import jax.numpy as jnp
+from functools import partial
 
 def select_gradients(gradients, x):
     """
@@ -26,62 +32,83 @@ def select_gradients(gradients, x):
 
     return active_gradients
 
-def compute_distances(states_x,
-                      states_y,
-                      compute_grad=True,
-                      compute_squared=False,
-                      only_use="position",
-                      eps=1e-4):
+
+def compute_information(states_x, states_y, H_func, R_func, type='logdet', compute_grad=True):
     """
-    Compute pairwise distances of x to y. Optionally, return the gradient w.r.t. x
+    Compute the information metric and its gradient w.r.t states_x using JAX.
 
     Args:
-        states_x (np.ndarray): array of shape (N, T, 6) representing states of x 
-        states_y (np.ndarray): array of shape (M, T, 6) representing states of y
-        compute_grad (bool): Whether or not to return the gradient, default True
-        compute_squared (bool): Whether or not to return squared distances instead of just distance. Default False
-        only_use (bool): One of `position`, `velocity`, or `None`. If `None`, entire state is used. If `position`, only position is used. If `velocity`, only velocity is used. Default `position`
-        eps (float) : divide by zero prevention. Default 1e-4
+        states_x (np.ndarray): array of shape (N, T, state_dim)
+        states_y (np.ndarray): array of shape (M, T, state_dim)
+        H_func (callable): function(states_x, states_y) -> observation jacobian H
+        R_func (callable): function(states_x, states_y) -> observation noise covariance R
+        type (str): 'logdet' or 'trace'
+        compute_grad (bool): whether to return gradient
 
     Returns:
-        dist (np.ndarray): array of shape (T, N, M). dist[i, j, k] is the distance from object j to object k at time i
-        grad (np.ndarray): array of shape (T, N, M, 3) if only_use is True otherwise (T, N, M, 6) of the gradients w.r.t x
+        info: array of shape (T, N, M)
+        grad: array of shape (T, N, M, state_dim) or None
     """
-    match only_use:
-        case "position":
-            x = states_x[..., :3]
-            y = states_y[..., :3]
-        case "velocity": 
-            x = states_x[..., 3:]
-            y = states_y[..., 3:]
-        case None:
-            x = states_x
-            y = states_y
-        case _:
-            raise ValueError("only_use must be one of 'position', 'velocity', or None")
-        
-    x_squared = (x**2).sum(axis=-1).T # (T, N)
-    y_squared = (y**2).sum(axis=-1).T # (T, M)
-    xy    = np.einsum('ntk,mtk->tnm', x, y) # (T, N, M)
 
-    l = x_squared[..., None] + y_squared[:, None, :] - 2*xy
-    dist = np.sqrt(l) if compute_squared else l
+    states_x = jnp.array(states_x)
+    states_y = jnp.array(states_y)
 
+    # Single-pair info function
+    def info_matrix(x, y):
+        H = H_func(x, y)
+        R = R_func(x, y)
+        info_mat = H.T @ jnp.linalg.solve(R, H)
+        if type == "det":
+            _, det = jnp.linalg.slogdet(info_mat)
+            return det
+        elif type == "trace":
+            return jnp.trace(info_mat)
+        else:
+            raise ValueError("type must be 'det' or 'trace'")
+
+    # Gradient wrt x explicitly
+    grad_fn = jax.grad(info_matrix, argnums=0) if compute_grad else None
+
+    # Vectorize info
+    v_info = jax.vmap(          # over T
+        jax.vmap(              # over N
+            jax.vmap(info_matrix, in_axes=(None, 0)),  # over M
+            in_axes=(0, None)
+        ),
+        in_axes=(1, 1)  # time dimension
+    )
+
+    # Vectorize grad
     if compute_grad:
-        dldx = 2 * (x[:, None, ...] - y[None, :, ...]) # (N, M, T, 6)
-        dldx = dldx.transpose((2, 0, 1, 3)) # (T, N, M, 6)
-        grad = dldx if compute_squared else (1 / (2 * np.sqrt(l+eps)))[..., None] * dldx 
+        v_grad = jax.vmap(
+            jax.vmap(
+                jax.vmap(grad_fn, in_axes=(None, 0)),
+                in_axes=(0, None)
+            ),
+            in_axes=(1, 1)
+        )
     else:
-        grad = None
+        v_grad = None
 
-    return dist, grad
+    @jax.jit
+    def run(states_x, states_y):
+        info = v_info(states_x, states_y)
+        grad = v_grad(states_x, states_y) if compute_grad else None
+
+        return info, grad
+    
+    info, grad = run(states_x, states_y)
+    
+    info = np.array(info)
+    grad = np.array(grad) if compute_grad else None
+
+    return info, grad
+
 
 def compute_generalized_distances(states_x,
                                   states_y,
                                   Q,
-                                  compute_grad=True,
-                                  compute_squared=False,
-                                  eps=1e-4):
+                                  compute_grad=True):
     
     """
     Compute pairwise generalized distances of x to y of the form (x-y)^T Q (x-y) where Q is a diagonal matrix. Optionally, return the gradient w.r.t. x
@@ -91,8 +118,6 @@ def compute_generalized_distances(states_x,
         states_y (np.ndarray): array of shape (M, T, 6) representing states of y
         Q (np.ndarray): array of shape (6,) representing the diagonal of the matrix Q
         compute_grad (bool): Whether or not to return the gradient, default True
-        compute_squared (bool): Whether or not to return squared distances instead of just distance. Default False
-        eps (float) : divide by zero prevention. Default 1e-4 
     Returns:
         dist (np.ndarray): array of shape (T, N, M). dist[i, j, k] is the distance from object j to object k at time i
         grad (np.ndarray): array of shape (T, N, M, 6) of the gradients w.r.t x
@@ -103,12 +128,12 @@ def compute_generalized_distances(states_x,
     xQy = np.einsum('k,ntk,mtk->tnm', Q, states_x, states_y) # (T, N, M)
 
     l = xQx[..., None] + yQy[:, None, :] - 2*xQy
-    dist = np.sqrt(l) if compute_squared else l
+    dist = l 
 
     if compute_grad:
         dldx = 2 * Q[None, None, None, :] * (states_x[:, None, ...] - states_y[None, :, ...]) # (N, M, T, 6)
         dldx = dldx.transpose((2, 0, 1, 3)) # (T, N, M, 6)
-        grad = dldx if compute_squared else (1 / (2 * np.sqrt(l+eps)))[..., None] * dldx 
+        grad = dldx
     else:
         grad = None 
 
@@ -131,9 +156,11 @@ def compute_projected_gradients(gradients, states, reduction='sum'):
     
     """
 
-    unit_direction_vectors = states[..., 3:] / np.linalg.norm(states[..., 3:], ord=2, axis=-1)[..., None] # (N, T, 3)
+    sdot = cr3bp_vec(None, states, mu=CR3BP_MU)  # (N, T, 6)
 
-    unreduced_projected_grad = np.einsum('ijk,ijk->ij', gradients[..., :3], unit_direction_vectors) # (N, T)
+    unit_direction_vectors = sdot / np.linalg.norm(sdot, axis=-1, keepdims=True)  # (N, T, 6)
+
+    unreduced_projected_grad = np.einsum('ijk,ijk->ij', gradients, unit_direction_vectors) # (N, T)
 
     match reduction:
         case "sum":
@@ -177,14 +204,12 @@ if __name__ == "__main__":
 
     projected_grad = compute_projected_gradients(gradients, states, reduction)
 
-    # print(projected_grad)
-
 
     M = 11
     states_x = np.random.randn(N, T, 6)
     states_y = np.random.randn(M, T, 6)
 
-    dist, grad = compute_distances(states_x, states_y)
+    dist, grad = compute_generalized_distances(states_x, states_y)
 
     print(dist.shape)
     print(grad.shape)

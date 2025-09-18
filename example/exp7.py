@@ -1,18 +1,18 @@
-# from root : python3 -m example.exp3
+# from root : python3 -m example.exp2
 
-# notes: we learn that ICs of the form (x0* + eps , x0* - eps) or (x1* + eps, x1* - eps) converge to local minima. The gradient is rubber banded to the optimal phase difference, but does not make progress to the optimal phase values.
+# note: using computed information (using jax)
+
 
 from src.Part3.assignment_problem import solve_assignment_problem
 from src.Part3.dynamics import gen_state_history, build_taylor_cr3bp
-from src.Part3.gradients import select_gradients, compute_generalized_distances, compute_projected_gradients
+from src.Part3.gradients import select_gradients, compute_information, compute_projected_gradients
+from src.Part3.utilities import _get_obs_jacobian
 from src.Part3.optimizers import SGD
 from src.Part3.constants import CR3BP_MU
 
 import numpy as np
+import jax.numpy as jnp
 import matplotlib.pyplot as plt
-
-plt.rcParams.update({'font.size': 14})
-
 
 if __name__ == "__main__":
     
@@ -28,12 +28,11 @@ if __name__ == "__main__":
     
     time_ = 3.225
     n_points = 215
-
-    start_phase = np.array([0.9, 0.1]) # 0.9, 0.1 -> local minima   0.901, 0.1 -> 0, 0.5  0.898, 0.1 -> 0.5, 0   if we make gradients noisy, this problem goes away
+    start_phases = np.array([
+                             
+                             [0.9, 0.1]])   
     
-    max_iter = 150
-
-    momenta = (0.2, 0.5, 0.8, 0.9, 0.99)
+    max_iters = (50,)
      
     initial_state_y = np.array([
                         0.8027692908754149,
@@ -50,13 +49,15 @@ if __name__ == "__main__":
                             n_points=n_points,
                             phase=(0, 0.5))
     
-    for momentum in momenta:
+
+    
+    for p, max_iter in zip(start_phases, max_iters):
 
         grad_history = np.empty(shape=(max_iter, 2))
         obj_history = np.empty(shape=(max_iter,))
         phase_history= np.empty(shape=(max_iter, 2))
 
-        optimizer = SGD(start_phase, modulo=1, momentum=momentum, lr=0.1, noise=0)
+        optimizer = SGD(p, modulo=1, momentum=0, lr=0.0001, noise=0)
 
         for n_iter in range(max_iter):
 
@@ -66,14 +67,14 @@ if __name__ == "__main__":
                                     n_points=n_points,
                                     phase=optimizer.parameters)
 
-            Q = np.array([1, 1, 1, 0, 0, 0])
+            dist, grad = compute_information(states_x=states_x, states_y=states_y, H_func=_get_obs_jacobian, R_func= lambda x, y: jnp.eye(4), compute_grad=True, type='trace')  # (n_points, 2, 2) , (n_points, 2, 2, 3)
 
-            dist, grad = compute_generalized_distances(states_x=states_x, states_y=states_y, Q=Q, compute_grad=True)  # (n_points, 2, 2) , (n_points, 2, 2, 3)
+            grad *= -1  # we want to maximize information
 
             x = np.zeros_like(dist)
             obj = 0
             for i in range(n_points):
-                x[i], objective = solve_assignment_problem(weights=dist[i], opt_type="min")
+                x[i], objective = solve_assignment_problem(weights=dist[i], opt_type="max")
                 obj += objective
 
             obj_history[n_iter] = obj / n_points
@@ -91,47 +92,40 @@ if __name__ == "__main__":
             print("Gradient: ", proj_g, "Objective: ", obj/n_points, "New Phases: ", phase)
 
         plt.figure(0)
-        plt.plot(obj_history, label=fr'$\gamma={momentum}$')
+        plt.plot(obj_history, label=f'IC: [{p[0]:.2f}, {p[1]:.2f}]')
 
         plt.figure(1)
-        plt.plot(np.linalg.norm(grad_history, axis=-1), label=fr'$\gamma={momentum}$')
+        plt.plot(np.linalg.norm(grad_history, axis=-1), label=f'IC: [{p[0]:.2f}, {p[1]:.2f}]')
 
         plt.figure(2)
-        plt.plot(np.abs(phase_history[:,0] - phase_history[:,1]), label=fr'$\gamma={momentum}$')
+        plt.plot(np.abs(phase_history[:,0] - phase_history[:,1]), label=f'IC: [{p[0]:.2f}, {p[1]:.2f}]')
 
         plt.figure(3)
-        plt.plot(np.abs(grad_history[:,0] + grad_history[:,1]), label=fr'$\gamma={momentum}$')
+        plt.plot(np.abs(grad_history[:,0] + grad_history[:,1]), label=f'IC: [{p[0]:.2f}, {p[1]:.2f}]')
+
     
     plt.figure(0)
     plt.xlabel("Iteration number")
     plt.ylabel("Objective")
     plt.legend()
-    plt.tight_layout()
-    # plt.savefig("media/exp3/obj.png")
-    
+    # plt.savefig("media/exp2/obj.png")
 
     plt.figure(1)
     plt.xlabel("Iteration number")
     plt.ylabel("Gradient norm")
     plt.legend()
-    plt.tight_layout()
-    # plt.savefig("media/exp3/gradnorm.png")
-    
+    # plt.savefig("media/exp2/gradnorm.png")
 
     plt.figure(2)
     plt.xlabel("Iteration number")
     plt.ylabel("Phase difference")
     plt.legend()
-    plt.tight_layout()
-    # plt.savefig("media/exp3/phasediff.png")
-    
+    # plt.savefig("media/exp2/phasediff.png")
 
     plt.figure(3)
     plt.xlabel("Iteration number")
     plt.ylabel("Grad component sum")
-    plt.tight_layout()
     plt.legend()
-    
 
-    
+
     plt.show()

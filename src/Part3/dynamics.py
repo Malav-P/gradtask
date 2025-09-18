@@ -1,6 +1,41 @@
 import numpy as np
 import heyoka as hy
 
+from .constants import CR3BP_MU
+
+def cr3bp_vec(t, s, mu):
+    """
+    Vectorized CR3BP dynamics.
+
+    Parameters:
+        t (float): Time parameter (not used in this function).
+        s (np.ndarray): State array [..., 6] with components [x, y, z, vx, vy, vz].
+        mu (float): Mass ratio of the CR3BP system.
+
+    Returns:
+        np.ndarray: Derivatives of the state array, same shape [..., 6].
+    """
+    x, y, z, vx, vy, vz = np.moveaxis(s, -1, 0)
+
+    r1 = np.sqrt((x + mu)**2 + y**2 + z**2)
+    r2 = np.sqrt((x - 1 + mu)**2 + y**2 + z**2)
+
+    # Initialize derivative array
+    ds = np.zeros_like(s)
+
+    # Positions
+    ds[..., 0] = vx
+    ds[..., 1] = vy
+    ds[..., 2] = vz
+
+    # Velocities
+    ds[..., 3] = 2*vy + x - ((1 - mu)/r1**3)*(x + mu) + (mu/r2**3)*(1 - mu - x)
+    ds[..., 4] = -2*vx + y - ((1 - mu)/r1**3)*y - (mu/r2**3)*y
+    ds[..., 5] = -((1 - mu)/r1**3)*z - (mu/r2**3)*z
+
+    return ds
+
+
 def cr3bp(t, s, mu):
     """
     Computes the derivatives of the state vector for the Circular Restricted Three-Body Problem (CR3BP).
@@ -285,9 +320,7 @@ def is_not_array_like(x):
 
 if __name__ == "__main__":
 
-    mu = 1.215058560962404e-02
-
-    ta = build_taylor_cr3bp(mu=mu, stm=False)
+    ta = build_taylor_cr3bp(mu=CR3BP_MU, stm=False)
     initial_state = np.array([
                     1.1540242813087864,
                     0.0,
