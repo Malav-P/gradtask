@@ -32,7 +32,7 @@ if __name__ == "__main__":
                              
                              [0.9, 0.1]])   
     
-    max_iters = (50,)
+    max_iters = (150,)
      
     initial_state_y = np.array([
                         0.8027692908754149,
