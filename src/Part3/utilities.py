@@ -62,3 +62,71 @@ def _get_obs_jacobian(x, y):
     H = jnp.concatenate([H_top, H_bottom], axis=0)
 
     return H
+
+
+indices = jnp.array([0, 1, 3, 4])  # x, y, xdot, ydot indices, use this if the orbit has not z component so that determinant is not 0
+
+# Single-pair info function
+def info_metric(x, y, H_func, R_func, type="det"):
+    """
+    Compute information metric for a single observer-target pair.
+
+    Args:
+        x: jnp array of shape (6,) state of observer
+        y: jnp array of shape (6,) state of target
+        H_func: Callable(jnp.array, jnp.array) -> observation jacobian H
+        R_func: Callable(jnp.array, jnp.array) -> observation noise covariance R
+        type: 'det' or 'trace'
+
+    Returns: 
+        scalar information measure, either logdet or trace of the information matrix
+    """
+    H = H_func(x, y)
+    R = R_func(x, y)
+    info_mat = H.T @ jnp.linalg.solve(R, H)
+
+    # extract on only x,y,xdot,ydot components
+    M_sub = info_mat[jnp.ix_(indices, indices)]
+
+    if type == "det":
+        _, det = jnp.linalg.slogdet(M_sub)
+        return det
+    elif type == "trace":
+        return jnp.trace(M_sub)
+    else:
+        raise ValueError("type must be 'det' or 'trace'")
+    
+
+def jit_vmap_info_metric(H_func, R_func, type="det"):
+    """
+    Returns a JIT-compiled, vectorized function that computes
+    info_metric and its gradient w.r.t. observer state x.
+
+    Args:
+        H_func: Callable(jnp.array, jnp.array) -> observation jacobian H
+        R_func: Callable(jnp.array, jnp.array) -> observation noise covariance R
+        type: 'det' or 'trace'
+
+    Returns:
+        Callable that takes in (states_x, states_y) and returns (info, grad) where:
+            states_x (np.ndarray): array of shape (N, T, state_dim)
+            states_y (np.ndarray): array of shape (M, T, state_dim)
+    """
+    # JIT the scalar info_metric + grad
+    info_and_grad = jax.jit(
+        jax.value_and_grad(
+            lambda x, y: info_metric(x, y, H_func=H_func, R_func=R_func, type=type),
+            argnums=0
+        )
+    )
+
+    # Vectorize over [T, N, M] dimensions without swapping axes
+    v_fn = jax.vmap(   # over T
+        jax.vmap(       # over N
+            jax.vmap(info_and_grad, in_axes=(None, 0)),  # over M
+            in_axes=(0, None)
+        ),
+        in_axes=(1, 1)
+    )
+
+    return v_fn

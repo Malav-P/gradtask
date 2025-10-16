@@ -1,12 +1,13 @@
-# from root : python3 -m example.exp2
+# from root : python3 -m example.exp7
 
 # note: using computed information (using jax)
+# note: need to clip gradients to avoid large changes in x after one step
 
 
 from src.Part3.assignment_problem import solve_assignment_problem
 from src.Part3.dynamics import gen_state_history, build_taylor_cr3bp
 from src.Part3.gradients import select_gradients, compute_information, compute_projected_gradients
-from src.Part3.utilities import _get_obs_jacobian
+from src.Part3.utilities import _get_obs_jacobian, jit_vmap_info_metric
 from src.Part3.optimizers import SGD
 from src.Part3.constants import CR3BP_MU
 
@@ -30,9 +31,9 @@ if __name__ == "__main__":
     n_points = 215
     start_phases = np.array([
                              
-                             [0.9, 0.1]])   
+                             [0.75, 0.25]])   
     
-    max_iters = (150,)
+    max_iters = (100,)
      
     initial_state_y = np.array([
                         0.8027692908754149,
@@ -49,6 +50,11 @@ if __name__ == "__main__":
                             n_points=n_points,
                             phase=(0, 0.5))
     
+    dt = 0.75* time_/n_points # observation time in TU
+    sigma =  6 * jnp.pi / 180 # observation uncertainty in radians
+    R = sigma**2 * jnp.block([[jnp.eye(2), jnp.zeros(shape=(2,2))], [jnp.zeros(shape=(2,2)), (2/(dt**2))*jnp.eye(2)]])
+
+    info_metric = jit_vmap_info_metric(H_func=_get_obs_jacobian, R_func=lambda x, y: R, type='det')
 
     
     for p, max_iter in zip(start_phases, max_iters):
@@ -57,7 +63,7 @@ if __name__ == "__main__":
         obj_history = np.empty(shape=(max_iter,))
         phase_history= np.empty(shape=(max_iter, 2))
 
-        optimizer = SGD(p, modulo=1, momentum=0, lr=0.0001, noise=0)
+        optimizer = SGD(p, modulo=1, momentum=0, lr=0.0005, noise=0, clip_grad_norm=50)
 
         for n_iter in range(max_iter):
 
@@ -67,7 +73,7 @@ if __name__ == "__main__":
                                     n_points=n_points,
                                     phase=optimizer.parameters)
 
-            dist, grad = compute_information(states_x=states_x, states_y=states_y, H_func=_get_obs_jacobian, R_func= lambda x, y: jnp.eye(4), compute_grad=True, type='trace')  # (n_points, 2, 2) , (n_points, 2, 2, 3)
+            dist, grad = compute_information(states_x=states_x, states_y=states_y, info_metric=info_metric)  # (n_points, 2, 2) , (n_points, 2, 2, 3)
 
             grad *= -1  # we want to maximize information
 

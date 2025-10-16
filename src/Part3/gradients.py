@@ -33,74 +33,30 @@ def select_gradients(gradients, x):
     return active_gradients
 
 
-def compute_information(states_x, states_y, H_func, R_func, type='logdet', compute_grad=True):
+def compute_information(states_x, states_y, info_metric):
     """
     Compute the information metric and its gradient w.r.t states_x using JAX.
 
     Args:
         states_x (np.ndarray): array of shape (N, T, state_dim)
         states_y (np.ndarray): array of shape (M, T, state_dim)
-        H_func (callable): function(states_x, states_y) -> observation jacobian H
-        R_func (callable): function(states_x, states_y) -> observation noise covariance R
-        type (str): 'logdet' or 'trace'
-        compute_grad (bool): whether to return gradient
+        info_metric (Callable): function to compute information metric for single (observer,target) pair. Preferably jitted.
 
     Returns:
         info: array of shape (T, N, M)
         grad: array of shape (T, N, M, state_dim) or None
     """
 
-    states_x = jnp.array(states_x)
-    states_y = jnp.array(states_y)
 
-    # Single-pair info function
-    def info_matrix(x, y):
-        H = H_func(x, y)
-        R = R_func(x, y)
-        info_mat = H.T @ jnp.linalg.solve(R, H)
-        if type == "det":
-            _, det = jnp.linalg.slogdet(info_mat)
-            return det
-        elif type == "trace":
-            return jnp.trace(info_mat)
-        else:
-            raise ValueError("type must be 'det' or 'trace'")
 
-    # Gradient wrt x explicitly
-    grad_fn = jax.grad(info_matrix, argnums=0) if compute_grad else None
+    states_x = jnp.asarray(states_x)
+    states_y = jnp.asarray(states_y)
 
-    # Vectorize info
-    v_info = jax.vmap(          # over T
-        jax.vmap(              # over N
-            jax.vmap(info_matrix, in_axes=(None, 0)),  # over M
-            in_axes=(0, None)
-        ),
-        in_axes=(1, 1)  # time dimension
-    )
 
-    # Vectorize grad
-    if compute_grad:
-        v_grad = jax.vmap(
-            jax.vmap(
-                jax.vmap(grad_fn, in_axes=(None, 0)),
-                in_axes=(0, None)
-            ),
-            in_axes=(1, 1)
-        )
-    else:
-        v_grad = None
+    info, grad = info_metric(states_x, states_y)
 
-    @jax.jit
-    def run(states_x, states_y):
-        info = v_info(states_x, states_y)
-        grad = v_grad(states_x, states_y) if compute_grad else None
-
-        return info, grad
-    
-    info, grad = run(states_x, states_y)
-    
     info = np.array(info)
-    grad = np.array(grad) if compute_grad else None
+    grad = np.array(grad) 
 
     return info, grad
 
