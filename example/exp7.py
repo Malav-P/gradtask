@@ -30,10 +30,9 @@ if __name__ == "__main__":
     time_ = 3.225
     n_points = 215
     start_phases = np.array([
-                             
                              [0.75, 0.25]])   
     
-    max_iters = (100,)
+    max_iters = (450,)
      
     initial_state_y = np.array([
                         0.8027692908754149,

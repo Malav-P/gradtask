@@ -1,6 +1,7 @@
 # from root : python3 -m example.exp2
 
 # notes: we learn that ICs of the form (x0* + eps , x0* - eps) or (x1* + eps, x1* - eps) converge to local minima. The gradient is rubber banded to the optimal phase difference, but does not make progress to the optimal phase values.
+# global optimum is (0, 0.5) or (0.5, 0)
 
 from src.Part3.assignment_problem import solve_assignment_problem
 from src.Part3.dynamics import gen_state_history, build_taylor_cr3bp
@@ -77,7 +78,7 @@ if __name__ == "__main__":
                              [0.9, 0.1],
                              [0.2, 0.6]])   
     
-    max_iters = (50, 50, 50)
+    max_iters = (100, 100, 100)
 
     # start_phases = np.array([
     #                          [0.2, 0.8]]) # 0.9, 0.1 -> local minima   0.901, 0.1 -> 0, 0.5  0.898, 0.1 -> 0.5, 0   if we make gradients noisy, this problem goes away
@@ -99,7 +100,16 @@ if __name__ == "__main__":
                             n_points=n_points,
                             phase=(0, 0.5))
     
+    _, states_x = gen_state_history(ta=ta,
+                        initial_state=np.tile(initial_state, (2, 1)),
+                        time=time_,
+                        n_points=n_points,
+                        phase=(0, 0.5))
 
+    data = {
+        "targets": states_y[:, 0, :],
+        "observers": states_x[:, 0, :]
+    }
 
     
     for p, max_iter in zip(start_phases, max_iters):
@@ -135,6 +145,7 @@ if __name__ == "__main__":
             obj_history[n_iter] = obj / n_points
 
             masked_g = select_gradients(grad, x)   # (2, n_points, 3)
+
             proj_g = compute_projected_gradients(gradients=masked_g, states=states_x, reduction="mean")
             grad_history[n_iter] = proj_g
 

@@ -6,6 +6,9 @@ e3 = jnp.array([0, 0, 1])
 e1 = jnp.array([1, 0, 0])
 e2 = jnp.array([0, 1, 0])
 
+indices = jnp.array([0, 1, 3, 4])  # x, y, xdot, ydot indices, use this if the orbit has not z component so that determinant is not 0
+
+
 
 def _get_transformation_matrix(rho: jnp.ndarray, eps=1e-2):
     v3 = rho / jnp.linalg.norm(rho)
@@ -32,7 +35,8 @@ def _get_transformation_matrix(rho: jnp.ndarray, eps=1e-2):
 
 def _get_obs_jacobian(x, y):
     """
-    Compute the observation Jacobian matrix H for a given state x and observer y.
+    Equation 7a of https://doi.org/10.1007/s40295-025-00520-8.
+    Compute the observation Jacobian matrix H = dh/dx for a given state x and observer y. 
 
     Args:
         x (jnp.ndarray): State vector of shape (6,)
@@ -64,9 +68,6 @@ def _get_obs_jacobian(x, y):
     return H
 
 
-indices = jnp.array([0, 1, 3, 4])  # x, y, xdot, ydot indices, use this if the orbit has not z component so that determinant is not 0
-
-# Single-pair info function
 def info_metric(x, y, H_func, R_func, type="det"):
     """
     Compute information metric for a single observer-target pair.
