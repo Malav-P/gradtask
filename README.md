@@ -5,7 +5,7 @@ This repository contains code for the paper \<insert conference paper here once 
 ## Installation
 After cloning the repository to your machine, create a conda environment
 ```bash
-conda env create -f environment.yml
+conda env create -f environment.yaml
 ```
 
 ### Gurobi license
