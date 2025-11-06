@@ -3,6 +3,7 @@ channels:
   - malavp
   - conda-forge
   - defaults
+  - gurobi
 dependencies:
   - numpy
   - matplotlib
