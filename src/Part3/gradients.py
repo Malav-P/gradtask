@@ -2,9 +2,7 @@ import numpy as np
 from .dynamics import cr3bp_vec
 from .constants import CR3BP_MU
 
-import jax
 import jax.numpy as jnp
-from functools import partial
 
 def select_gradients(gradients, x):
     """

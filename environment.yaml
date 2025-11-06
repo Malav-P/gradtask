@@ -1,0 +1,15 @@
+name: part3
+channels:
+  - malavp
+  - conda-forge
+  - defaults
+dependencies:
+  - numpy
+  - matplotlib
+  - python
+  - conda-forge::heyoka.py
+  - gurobi
+  - scipy
+  - plotly
+  - scikit-learn
+  - jax
