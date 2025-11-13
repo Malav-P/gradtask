@@ -79,9 +79,8 @@ def solve_assignment_problem_time_expanded(weights : np.ndarray[float],
 
     n_timesteps, n_servicers, n_customers = weights.shape
 
-    # standardize weights into [0, 1] and nondimensionalize assignment penalty
-    weights = (weights - min(weights.flatten())) / (max(weights.flatten()) - min(weights.flatten()))
-    assignment_penalty_lambda = assignment_penalty_lambda / n_timesteps
+    # standardize weights into [0, 1] (in order to ensure coefficients from logdet become positive)
+    weights_norm = (weights - np.min(weights)) / (np.max(weights) - np.min(weights))
 
     env = gp.Env(empty=True)
     env.setParam("OutputFlag",0)
@@ -98,7 +97,7 @@ def solve_assignment_problem_time_expanded(weights : np.ndarray[float],
     x = m.addMVar(shape=weights.shape, vtype=GRB.BINARY, name="x")
 
     # Set objective
-    m.setObjective(((weights - assignment_penalty_lambda / n_timesteps) * x).sum(), OPT)
+    m.setObjective(((weights_norm - assignment_penalty_lambda) * x).sum(), OPT)
 
     # each servicer can service at most 1 customer
     # ∑_{j ∈ Customers} x_ij <= 1,  ∀ i ∈ Servicers
@@ -115,7 +114,8 @@ def solve_assignment_problem_time_expanded(weights : np.ndarray[float],
 
     np.rint(x.X, out=x.X)
     assignment = x.X.astype(int)
-    objective = m.getObjective().getValue()
+    # objective = m.getObjective().getValue()
+    objective = ((weights * assignment).sum())
 
     return assignment , objective
 
@@ -194,7 +194,7 @@ if __name__ == "__main__":
 
     np.random.seed(1)
     weights = np.random.uniform(low = 0, high=1, size=(n_timesteps, num_servicers, num_customers))
-    assignment_penalty_lambda = 0 * np.ones_like(weights)
+    assignment_penalty_lambda = 0.1
 
     x, obj = solve_assignment_problem_time_expanded(weights, assignment_penalty_lambda=assignment_penalty_lambda, opt_type="max")
 
@@ -202,7 +202,7 @@ if __name__ == "__main__":
     # print(f"Average number of assignments per observer per timestep: {x.sum() / n_timesteps / num_servicers}")
 
     res = []
-    for lamda in np.linspace(1, 20, 100):
+    for lamda in np.linspace(0, 1, 100):
         assignment_penalty_lambda = lamda * np.ones_like(weights)
         x, obj = solve_assignment_problem_time_expanded(weights, assignment_penalty_lambda=assignment_penalty_lambda, opt_type="max")
         avg_assignments = x.sum() / n_timesteps / num_servicers
@@ -221,5 +221,6 @@ if __name__ == "__main__":
     plt.xlabel("Assignment Penalty Lambda")
     plt.ylabel("Average Assignments per Servicer per Timestep")
     plt.title("Effect of Assignment Penalty on Average Assignments")
+    plt.legend()
     plt.show()
 
