@@ -53,6 +53,8 @@ def compute_information(states_x, states_y, info_metric):
 
     info, grad = info_metric(states_x, states_y)
 
+    # potential TODO: normalize coefficients to [0, 1] range and scale gradients accordingly
+
     info = np.array(info)
     grad = np.array(grad) 
 
@@ -93,7 +95,7 @@ def compute_generalized_distances(states_x,
 
     return dist, grad
 
-def compute_projected_gradients(gradients, states, reduction='sum'):
+def compute_projected_gradients(gradients, states, reduction='sum', weights=None):
     """
     Compute the projected gradient of each satellite along its orbit.
 
@@ -104,6 +106,7 @@ def compute_projected_gradients(gradients, states, reduction='sum'):
         states (np.ndarray): array of shape (N, T, 6) representing the state vectors of sattelites. states[i, j, k] is the k-th state element
                              of the i-th observer and the j-th timestep
         reduction (str): the reduction operation to apply along the time axis. Default sum
+        weights (np.ndarray): weights for weighted averages and sums
 
     Returns:
         projected (np.ndarray) : array of shape (N, T) or (N,) the projected gradient, depending on the reduction operation
@@ -120,7 +123,7 @@ def compute_projected_gradients(gradients, states, reduction='sum'):
         case "sum":
             projected_grad = unreduced_projected_grad.sum(axis=-1)
         case "mean":
-            projected_grad = unreduced_projected_grad.mean(axis=-1)
+            projected_grad = np.average(unreduced_projected_grad, axis=-1, weights=weights)
         case None:
             projected_grad = unreduced_projected_grad
         case _:

@@ -1,5 +1,6 @@
 import jax
 import jax.numpy as jnp
+import numpy as np
 
 S = jnp.eye(2, 3)
 e3 = jnp.array([0, 0, 1])
@@ -32,6 +33,29 @@ def _get_transformation_matrix(rho: jnp.ndarray, eps=1e-2):
     T_c = jnp.vstack((v1, v2, v3))
     return T_c
 
+def angleanglerate_jacobian(x: jnp.ndarray, y: jnp.ndarray):
+    """
+    Compute the observation Jacobian matrix H = dh/dx for a given state x and observer y. 
+
+    Args:
+        x (jnp.ndarray): State vector of shape (6,)
+        y (jnp.ndarray): Observer state vector of shape (6,)
+    Returns:
+        H (jnp.ndarray): Observation Jacobian matrix of shape (6, 6).
+    """
+
+
+    r_rel = x[0:3] - y[0:3]
+    v_rel = x[3:6] - y[3:6]
+    rnorm = jnp.linalg.norm(r_rel)
+    H11 = jnp.eye(3)/rnorm - jnp.outer(r_rel,r_rel)/rnorm**3
+    H21 = -jnp.outer(v_rel,r_rel) / rnorm**3 \
+        -(jnp.outer(r_rel,v_rel) + jnp.dot(r_rel,v_rel)*jnp.eye(3)) / rnorm**3\
+        + 3*jnp.dot(r_rel,v_rel) * jnp.outer(r_rel,r_rel) / rnorm**5
+    return jnp.concatenate((
+        jnp.concatenate((H11, jnp.zeros((3,3))), axis=1),
+        jnp.concatenate((H21, H11), axis=1),
+    ))
 
 def _get_obs_jacobian(x, y):
     """

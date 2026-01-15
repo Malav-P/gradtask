@@ -61,7 +61,7 @@ def solve_assignment_problem_cpsat(weights : np.ndarray[float],
 
 
 def solve_assignment_problem_time_expanded(weights : np.ndarray[float],
-                                           assignment_penalty_lambda: np.ndarray[float],
+                                           assignment_penalty_lambda: Optional[np.ndarray[float]] = 0.0,
                                            opt_type: Optional[str] = "max"):
     """
     Solve the assignment problem given a weight matrix describing the profits/cost of assigning
@@ -79,8 +79,11 @@ def solve_assignment_problem_time_expanded(weights : np.ndarray[float],
 
     n_timesteps, n_servicers, n_customers = weights.shape
 
-    # standardize weights into [0, 1] (in order to ensure coefficients from logdet become positive)
+    # standardize weights into [0, 1] (in order to ensure coefficients from logdet information objective become positive)
     weights_norm = (weights - np.min(weights)) / (np.max(weights) - np.min(weights))
+
+    if opt_type == "min":
+        weights_norm = 1 / (weights_norm + 1e-6)  # avoid division by zero
 
     env = gp.Env(empty=True)
     env.setParam("OutputFlag",0)
@@ -88,7 +91,7 @@ def solve_assignment_problem_time_expanded(weights : np.ndarray[float],
 
     m = gp.Model("time expanded assignment problem", env=env)
 
-    OPT = GRB.MAXIMIZE if opt_type == "max" else GRB.MINIMIZE
+    OPT = GRB.MAXIMIZE
 
     # Silence model output
     m.Params.LogToConsole = 0
