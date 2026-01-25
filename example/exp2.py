@@ -3,7 +3,7 @@
 # notes: we learn that ICs of the form (x0* + eps , x0* - eps) or (x1* + eps, x1* - eps) converge to local minima. The gradient is rubber banded to the optimal phase difference, but does not make progress to the optimal phase values.
 # global optimum is (0, 0.5) or (0.5, 0)
 
-from src.Part3.assignment_problem import solve_assignment_problem
+from src.Part3.assignment_problem import solve_assignment_problem_time_expanded
 from src.Part3.dynamics import gen_state_history, build_taylor_cr3bp
 from src.Part3.gradients import select_gradients, compute_generalized_distances, compute_projected_gradients
 from src.Part3.optimizers import SGD
@@ -78,7 +78,7 @@ if __name__ == "__main__":
                              [0.9, 0.1],
                              [0.2, 0.6]])   
     
-    max_iters = (100, 100, 100)
+    max_iters = (50, 50, 50)
 
     # start_phases = np.array([
     #                          [0.2, 0.8]]) # 0.9, 0.1 -> local minima   0.901, 0.1 -> 0, 0.5  0.898, 0.1 -> 0.5, 0   if we make gradients noisy, this problem goes away
@@ -118,7 +118,7 @@ if __name__ == "__main__":
         obj_history = np.empty(shape=(max_iter,))
         phase_history= np.empty(shape=(max_iter, 2))
 
-        optimizer = SGD(p, modulo=1, momentum=0, lr=0.1, noise=0)
+        optimizer = SGD(p, modulo=1, momentum=0, lr=0.5, noise=0)
 
         for n_iter in range(max_iter):
 
@@ -136,11 +136,13 @@ if __name__ == "__main__":
 
             dist, grad = compute_generalized_distances(states_x=states_x, states_y=states_y, Q=Q, compute_grad=True)  # (n_points, 2, 2) , (n_points, 2, 2, 3)
 
-            x = np.zeros_like(dist)
-            obj = 0
-            for i in range(n_points):
-                x[i], objective = solve_assignment_problem(weights=dist[i], opt_type="min")
-                obj += objective
+            # x = np.zeros_like(dist)
+            # obj = 0
+            # for i in range(n_points):
+            #     x[i], objective = solve_assignment_problem(weights=dist[i], opt_type="min")
+            #     obj += objective
+
+            x, obj = solve_assignment_problem_time_expanded(weights=dist, opt_type="min")
 
             obj_history[n_iter] = obj / n_points
 
@@ -155,7 +157,7 @@ if __name__ == "__main__":
 
             phase_history[n_iter] = phase
 
-            print("Gradient: ", proj_g, "Objective: ", obj/n_points, "New Phases: ", phase)
+            print("Gradient: ", proj_g, "Objective: ", obj/n_points, "New Phases: ", phase, "Number of assignments: ", np.sum(x))
 
         plt.figure(0)
         plt.plot(obj_history, label=f'IC: [{p[0]:.2f}, {p[1]:.2f}]')
@@ -172,26 +174,34 @@ if __name__ == "__main__":
     
     plt.figure(0)
     plt.xlabel("Iteration number")
-    plt.ylabel("Objective")
+    plt.ylabel("Time Averaged LP Objective")
     plt.legend()
-    # plt.savefig("media/exp2/obj.png")
+    plt.grid(True)
+    plt.tight_layout()
+
+    plt.savefig("media/exp2/obj.png")
 
     plt.figure(1)
     plt.xlabel("Iteration number")
     plt.ylabel("Gradient norm")
     plt.legend()
-    # plt.savefig("media/exp2/gradnorm.png")
+    plt.grid(True)
+    plt.tight_layout()
+    plt.savefig("media/exp2/gradnorm.png")
 
     plt.figure(2)
     plt.xlabel("Iteration number")
     plt.ylabel("Phase difference")
     plt.legend()
-    # plt.savefig("media/exp2/phasediff.png")
+    plt.grid(True)
+    plt.tight_layout()
+    plt.savefig("media/exp2/phasediff.png")
 
     plt.figure(3)
     plt.xlabel("Iteration number")
     plt.ylabel("Grad component sum")
     plt.legend()
-
+    plt.grid(True)
+    plt.tight_layout()
 
     plt.show()

@@ -8,7 +8,7 @@ from src.Part3.dynamics import gen_state_history, build_taylor_cr3bp
 plt.rcParams.update({'font.size': 14})
 
 # seed 0 gives okay result
-np.random.seed(100)
+# np.random.seed(100)
 
 
 # read .npz file

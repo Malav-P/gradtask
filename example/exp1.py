@@ -2,7 +2,7 @@
 
 # two observers on an L2 halo orbit and two static target points at (1, +- 0.2, 0)
 
-from src.Part3.assignment_problem import solve_assignment_problem
+from src.Part3.assignment_problem import solve_assignment_problem_time_expanded
 from src.Part3.dynamics import gen_state_history, build_taylor_cr3bp
 from src.Part3.gradients import select_gradients, compute_generalized_distances, compute_projected_gradients
 from src.Part3.constants import CR3BP_MU
@@ -81,7 +81,7 @@ if __name__ == "__main__":
                              [0.9, 0.1],
                              [0.2, 0.6]])
     
-    max_iter = 20
+    max_iter = 100
     grad_history = np.zeros(shape=(max_iter, 2))
     obj_history = np.zeros(shape=(max_iter,))
     phase_history= np.zeros(shape=(max_iter, 2))
@@ -108,11 +108,13 @@ if __name__ == "__main__":
 
             dist, grad = compute_generalized_distances(states_x=states_x, states_y=states_y, Q=Q, compute_grad=True)  # (n_points, 2, 2) , (n_points, 2, 2, 3)
 
-            x = np.zeros_like(dist)
-            obj = 0
-            for i in range(n_points):
-                x[i], objective = solve_assignment_problem(weights=dist[i], opt_type="min")
-                obj += objective
+            # x = np.zeros_like(dist)
+            # obj = 0
+            # for i in range(n_points):
+            #     x[i], objective = solve_assignment_problem(weights=dist[i], opt_type="min")
+            #     obj += objective
+
+            x, obj = solve_assignment_problem_time_expanded(weights=dist, opt_type="min")
 
             obj_history[n_iter] = obj / n_points
 
