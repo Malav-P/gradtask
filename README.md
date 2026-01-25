@@ -39,6 +39,7 @@ Note that an unrestricted gurobi license is required to run the experiments in t
 
 ## Experiments
 All experiments are under the `example/` directory as .py files. For example, you can run experiment 1 like so from the root dir:
+
 ```
 python -m example.exp1
 ```

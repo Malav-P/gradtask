@@ -38,15 +38,15 @@ def angleanglerate_jacobian(x: jnp.ndarray, y: jnp.ndarray):
     Compute the observation Jacobian matrix H = dh/dx for a given state x and observer y. 
 
     Args:
-        x (jnp.ndarray): State vector of shape (6,)
-        y (jnp.ndarray): Observer state vector of shape (6,)
+        x (jnp.ndarray):  observer state vector of shape (6,)
+        y (jnp.ndarray):  target state vector of shape (6,)
     Returns:
         H (jnp.ndarray): Observation Jacobian matrix of shape (6, 6).
     """
 
 
-    r_rel = x[0:3] - y[0:3]
-    v_rel = x[3:6] - y[3:6]
+    r_rel = y[0:3] - x[0:3]
+    v_rel = y[3:6] - x[3:6]
     rnorm = jnp.linalg.norm(r_rel)
     H11 = jnp.eye(3)/rnorm - jnp.outer(r_rel,r_rel)/rnorm**3
     H21 = -jnp.outer(v_rel,r_rel) / rnorm**3 \
@@ -56,6 +56,29 @@ def angleanglerate_jacobian(x: jnp.ndarray, y: jnp.ndarray):
         jnp.concatenate((H11, jnp.zeros((3,3))), axis=1),
         jnp.concatenate((H21, H11), axis=1),
     ))
+
+
+# def angleanglerate_R(x: jnp.ndarray, y: jnp.ndarray, sigma: float):
+#     """
+#     Compute the observation noise covariance R for angle-angle rate measurements.
+
+#     Args:
+#         x (jnp.ndarray): observer state vector of shape (6,)
+#         y (jnp.ndarray): target state vector of shape (6,)
+#         sigma (float): Standard deviation of the observation noise.
+
+#     Returns:
+#         R (jnp.ndarray): Observation noise covariance matrix of shape (6, 6).
+#     """
+
+#     r_rel = y[0:3] - x[0:3]
+#     v_rel = y[3:6] - x[3:6]
+    
+
+#     return sigma**2 * jnp.block([
+#         [jnp.dot(r_rel, r_rel) * jnp.eye(3) - jnp.outer(r_rel, r_rel), jnp.zeros((3,3))],
+#         [jnp.zeros((3,3)), jnp.dot(v_rel, v_rel) * jnp.eye(3) - jnp.outer(v_rel, v_rel)]
+#     ])
 
 def _get_obs_jacobian(x, y):
     """
