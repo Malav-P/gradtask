@@ -107,7 +107,10 @@ vm = ValidationModel(
                      filter=filter,
                      timestep=timestep)
 
+state = np.random.get_state()
 target_hist, _ = vm.run(u=u,filter_observers=False, meas_model_sigma = sigma, dt_exposure = t_expose)
+
+np.random.set_state(state)
 target_hist_rand, _ = vm.run(u=U,filter_observers=False, meas_model_sigma = sigma, dt_exposure = t_expose)
 
 
