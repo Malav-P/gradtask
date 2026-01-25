@@ -31,7 +31,7 @@ def select_gradients(gradients, x):
     return active_gradients
 
 
-def compute_information(states_x, states_y, info_metric):
+def compute_information(states_x, states_y, info_metric, stm_y=None):
     """
     Compute the information metric and its gradient w.r.t states_x using JAX.
 
@@ -39,6 +39,7 @@ def compute_information(states_x, states_y, info_metric):
         states_x (np.ndarray): array of shape (N, T, state_dim)
         states_y (np.ndarray): array of shape (M, T, state_dim)
         info_metric (Callable): function to compute information metric for single (observer,target) pair. Preferably jitted.
+        stm_y (np.ndarray): array of shape (M, T, state_dim, state_dim) representing state transition matrices of targets. Default None
 
     Returns:
         info: array of shape (T, N, M)
@@ -49,9 +50,9 @@ def compute_information(states_x, states_y, info_metric):
 
     states_x = jnp.asarray(states_x)
     states_y = jnp.asarray(states_y)
+    stm_y = jnp.asarray(stm_y) if stm_y is not None else None
 
-
-    info, grad = info_metric(states_x, states_y)
+    info, grad = info_metric(states_x, states_y, stm_y)
 
     # potential TODO: normalize coefficients to [0, 1] range and scale gradients accordingly
 

@@ -42,7 +42,7 @@ if __name__ == "__main__":
                 ])
 
     config = Config(
-        exp_name = "exp7",
+        exp_name = "exp7_forecast_info",
         period = 3.225,
         n_points = 215,
         max_iters = (1200,),
@@ -79,12 +79,31 @@ if __name__ == "__main__":
     info_metric = jit_vmap_info_metric(H_func=H_func, R_func=R_func, type='det')
   
     
-    ta = build_taylor_cr3bp(mu=config.mu, stm=False, batched=True)
-    _, states_y = gen_state_history(ta=ta,
+    ta = build_taylor_cr3bp(mu=config.mu, stm=True, batched=True)
+    _, outs = gen_state_history(ta=ta,
                             initial_state=config.initial_state_target,
                             time=config.period,
                             n_points=config.n_points,
                             phase=config.initial_state_target_phases)
+    
+    states_y = outs[..., :6]
+    stms_y = outs[..., 6:] # (M, T, 6*6)
+
+    M, T, _ = stms_y.shape
+
+    stms_y = stms_y.reshape(M, T, 6, 6)
+    stm_T = stms_y[:, -1]  # (M, 6, 6)
+
+    # stms_y = np.linalg.solve(
+    #     stm_T.transpose(0, 2, 1)[:, None, :, :],   # (M, 1, 6, 6)
+    #     stms_y.transpose(0, 1, 3, 2)               # (M, T, 6, 6)
+    # ).transpose(0, 1, 3, 2)
+
+    stms_y = stms_y @ np.linalg.inv(stm_T)[:, None, :, :]
+
+
+    del ta
+    ta = build_taylor_cr3bp(mu=config.mu, stm=False, batched=True)
 
     
     for p, max_iter in zip(config.initial_state_observer_phases, config.max_iters):
@@ -106,7 +125,7 @@ if __name__ == "__main__":
                                     n_points=config.n_points,
                                     phase=optimizer.parameters)
 
-            dist, grad = compute_information(states_x=states_x, states_y=states_y, info_metric=info_metric)  # (n_points, 2, 2) , (n_points, 2, 2, 3)
+            dist, grad = compute_information(states_x=states_x, states_y=states_y, info_metric=info_metric, stm_y=stms_y)  # (n_points, 2, 2) , (n_points, 2, 2, 3)
 
             grad *= -1  # we want to maximize information
 
@@ -132,7 +151,7 @@ if __name__ == "__main__":
             print("Gradient: ", proj_g, "Objective: ", obj/config.n_points, "New Phases: ", phase, "Number of assignments", x.sum())
 
 
-        np.savez("exp7_new.npz", u=best_controls, optimal_observer_phases = optimizer.parameters, **asdict(config))
+        np.savez(f"{config.exp_name}.npz", u=best_controls, optimal_observer_phases = optimizer.parameters, **asdict(config))
 
 
         plt.figure(0)

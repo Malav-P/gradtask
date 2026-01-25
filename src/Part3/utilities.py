@@ -115,7 +115,7 @@ def _get_obs_jacobian(x, y):
     return H
 
 
-def info_metric(x, y, H_func, R_func, type="det"):
+def info_metric(x, y, H_func, R_func, type="det", stm_y=None):
     """
     Compute information metric for a single observer-target pair.
 
@@ -125,6 +125,7 @@ def info_metric(x, y, H_func, R_func, type="det"):
         H_func: Callable(jnp.array, jnp.array) -> observation jacobian H
         R_func: Callable(jnp.array, jnp.array) -> observation noise covariance R
         type: 'det' or 'trace'
+        stm_y: jnp array of shape (6,6), state transition matrix of target (optional, not used here)
 
     Returns: 
         scalar information measure, either logdet or trace of the information matrix
@@ -132,6 +133,9 @@ def info_metric(x, y, H_func, R_func, type="det"):
     H = H_func(x, y)
     R = R_func(x, y)
     info_mat = H.T @ jnp.linalg.solve(R, H)
+
+    if stm_y is not None:
+        info_mat = stm_y.T @ info_mat @ stm_y
 
     # extract on only x,y,xdot,ydot components
     M_sub = info_mat[jnp.ix_(indices, indices)]
@@ -156,14 +160,15 @@ def jit_vmap_info_metric(H_func, R_func, type="det"):
         type: 'det' or 'trace'
 
     Returns:
-        Callable that takes in (states_x, states_y) and returns (info, grad) where:
-            states_x (np.ndarray): array of shape (N, T, state_dim)
-            states_y (np.ndarray): array of shape (M, T, state_dim)
+        Callable that takes in (states_x, states_y, stm_y) and returns (info, grad) where:
+            states_x (jnp.array): array of shape (N, T, state_dim)
+            states_y (jnp.array): array of shape (M, T, state_dim)
+            stm_y (jnp.array): Optional array of shape (M, T, state_dim, state_dim)
     """
     # JIT the scalar info_metric + grad
     info_and_grad = jax.jit(
         jax.value_and_grad(
-            lambda x, y: info_metric(x, y, H_func=H_func, R_func=R_func, type=type),
+            lambda x, y, stm_y: info_metric(x, y, H_func=H_func, R_func=R_func, type=type, stm_y=stm_y),
             argnums=0
         )
     )
@@ -171,10 +176,10 @@ def jit_vmap_info_metric(H_func, R_func, type="det"):
     # Vectorize over [T, N, M] dimensions without swapping axes
     v_fn = jax.vmap(   # over T
         jax.vmap(       # over N
-            jax.vmap(info_and_grad, in_axes=(None, 0)),  # over M
-            in_axes=(0, None)
+            jax.vmap(info_and_grad, in_axes=(None, 0, 0)),  # over M
+            in_axes=(0, None, None)
         ),
-        in_axes=(1, 1)
+        in_axes=(1, 1, 1)
     )
 
     return v_fn

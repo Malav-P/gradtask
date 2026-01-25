@@ -10,9 +10,11 @@ plt.rcParams.update({'font.size': 14})
 # seed 0 gives okay result
 # np.random.seed(100)
 
+fname = "exp7.npz"
+
 
 # read .npz file
-config = np.load("exp7.npz")
+config = np.load(fname)
 
 
 # CR3BP dynamics parameters
@@ -107,7 +109,10 @@ vm = ValidationModel(
                      filter=filter,
                      timestep=timestep)
 
+state = np.random.get_state()
 target_hist, _ = vm.run(u=u,filter_observers=False, meas_model_sigma = sigma, dt_exposure = t_expose)
+
+np.random.set_state(state)
 target_hist_rand, _ = vm.run(u=U,filter_observers=False, meas_model_sigma = sigma, dt_exposure = t_expose)
 
 
@@ -181,5 +186,5 @@ plt.grid(True)
 plt.tight_layout()
 plt.show()
 
-# print(u)
+# print(u.sum())
 # print(U)
