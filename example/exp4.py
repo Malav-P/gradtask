@@ -1,10 +1,10 @@
 # from root : python3 -m example.exp4
 
-from src.Part3.assignment_problem import solve_assignment_problem_time_expanded
-from src.Part3.dynamics import gen_state_history, build_taylor_cr3bp
-from src.Part3.gradients import select_gradients, compute_generalized_distances, compute_projected_gradients
-from src.Part3.optimizers import SGD
-from src.Part3.constants import CR3BP_MU
+from blackboxphaseopt.assignment_problem import solve_assignment_problem_time_expanded
+from blackboxphaseopt.dynamics import gen_state_history, build_taylor_cr3bp
+from blackboxphaseopt.gradients import select_gradients, compute_generalized_distances, compute_projected_gradients
+from blackboxphaseopt.optimizers import SGD
+from blackboxphaseopt.constants import CR3BP_MU
 
 import numpy as np
 import matplotlib.pyplot as plt

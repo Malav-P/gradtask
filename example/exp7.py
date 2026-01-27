@@ -4,17 +4,19 @@
 # note: need to clip gradients to avoid large changes in x after one step
 
 
-from src.Part3.assignment_problem import solve_assignment_problem_time_expanded
-from src.Part3.dynamics import gen_state_history, build_taylor_cr3bp
-from src.Part3.gradients import select_gradients, compute_information, compute_projected_gradients
-from src.Part3.utilities import _get_obs_jacobian, angleanglerate_jacobian, jit_vmap_info_metric
-from src.Part3.optimizers import SGD
-from src.Part3.constants import Config
+from blackboxphaseopt.assignment_problem import solve_assignment_problem_time_expanded
+from blackboxphaseopt.dynamics import gen_state_history, build_taylor_cr3bp
+from blackboxphaseopt.gradients import select_gradients, compute_information, compute_projected_gradients
+from blackboxphaseopt.utilities import  angleanglerate_jacobian, jit_vmap_info_metric
+from blackboxphaseopt.optimizers import SGD
+from blackboxphaseopt.constants import Config
 
 
 import numpy as np
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
+
+from dataclasses import asdict
 
 plt.rcParams.update({'font.size': 14})
 
@@ -74,7 +76,8 @@ if __name__ == "__main__":
 
     ########################################################
 
-    info_metric = jit_vmap_info_metric(H_func=H_func, R_func=R_func, type='det')
+    indices = jnp.array([0,1,3,4])  # select x, y, xdot, ydot
+    info_metric = jit_vmap_info_metric(H_func=H_func, R_func=R_func, type='det', indices=indices)
   
     
     ta = build_taylor_cr3bp(mu=config.mu, stm=False, batched=True)
@@ -91,7 +94,7 @@ if __name__ == "__main__":
         obj_history = np.empty(shape=(max_iter,))
         phase_history= np.empty(shape=(max_iter, 2))
 
-        optimizer = SGD(p, modulo=1, momentum=0, lr=0.001, noise=0, cosine_anneal=True, t_max=max_iter, eta_min=1e-4, clip_grad_norm=10)
+        optimizer = SGD(p, modulo=1, momentum=0., lr=0.001, noise=0, cosine_anneal=True, t_max=max_iter, eta_min=1e-4, clip_grad_norm=20)
 
         best_obj = -np.inf
         best_controls = None
@@ -130,7 +133,7 @@ if __name__ == "__main__":
             print("Gradient: ", proj_g, "Objective: ", obj/config.n_points, "New Phases: ", phase, "Number of assignments", x.sum())
 
 
-        # np.savez("exp7.npz", u=best_controls, optimal_observer_phases = optimizer.parameters, **asdict(config))
+        np.savez("exp7_new.npz", u=best_controls, optimal_observer_phases = optimizer.parameters, **asdict(config))
 
 
         plt.figure(0)

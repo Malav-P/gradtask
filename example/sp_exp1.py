@@ -4,16 +4,15 @@
 # note: need to clip gradients to avoid large changes in x after one step
 
 
-from src.Part3.shortest_path_problem import solve_shortest_path_time_expanded, solve_shortest_path
-from src.Part3.dynamics import gen_state_history, build_taylor_cr3bp
-from src.Part3.gradients import select_gradients, compute_generalized_distances, compute_projected_gradients
-from src.Part3.optimizers import SGD
-from src.Part3.constants import Config, CR3BP_MU
+from blackboxphaseopt.shortest_path_problem import solve_shortest_path_time_expanded, solve_shortest_path
+from blackboxphaseopt.dynamics import gen_state_history, build_taylor_cr3bp
+from blackboxphaseopt.gradients import  compute_generalized_distances, compute_projected_gradients
+from blackboxphaseopt.optimizers import SGD
+from blackboxphaseopt.constants import Config, CR3BP_MU
 
 
 import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib.colors as mcolors
 
 def gd_loop():
     initial_state = np.array([ 
@@ -83,13 +82,7 @@ def gd_loop():
             states_x = np.concatenate([states_x, earth_expanded, moon_expanded], axis=0)
             dist, grad = compute_generalized_distances(states_x=states_x, states_y=states_x, Q=np.array([1, 1, 1, 0, 0, 0]))
 
-            
-            # objs = []
-            # for t in range(config.n_points):
-            #     x_var, path, OBJ = solve_shortest_path(dist[t], n_satellites, n_satellites + 1)
-            #     objs.append(OBJ)
-            #     x[t] = x_var
-            # obj = np.average(objs)
+        
 
             x, _, obj = solve_shortest_path_time_expanded(dist, n_satellites, n_satellites + 1)
             obj /= config.n_points
@@ -162,7 +155,7 @@ def plot_example():
     # Compute Gaussian values
     weights = A * np.exp(-((xx + 3 - mu)**2) / (2 * sigma**2))
 
-    candidates = np.linspace(0.497, 0.5, 22)
+    candidates = np.linspace(0.494, 0.496, 22)
     # candidates = [0.5, 0.498]
     # x_prev = None
 
@@ -188,12 +181,6 @@ def plot_example():
             objs.append(OBJ)
             x[t] = x_var
 
-        #     if x_prev is not None:
-        #         s = (x_prev[t] == x[t]).sum() 
-        #         if s != 16:
-        #             print(s, t)
-
-        # x_prev = x.copy()
 
         masked_gradients = grad * x[..., np.newaxis]  # shape: (T, N, N, state_dim)
 
@@ -258,5 +245,5 @@ def plot_example():
 
 if __name__ == "__main__":
 
-    gd_loop()
-    # plot_example()
+    # gd_loop()
+    plot_example()

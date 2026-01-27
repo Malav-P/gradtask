@@ -1,16 +1,9 @@
 name: part3
 channels:
-  - malavp
+  - local
   - conda-forge
   - defaults
   - gurobi
 dependencies:
-  - numpy
+  - blackboxphaseopt==0.1.0
   - matplotlib
-  - python
-  - conda-forge::heyoka.py
-  - gurobi
-  - scipy
-  - plotly
-  - scikit-learn
-  - jax
