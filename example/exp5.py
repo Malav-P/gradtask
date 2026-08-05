@@ -13,46 +13,54 @@ import matplotlib.pyplot as plt
 plt.rcParams.update({'font.size': 14})
 
 def plot_configuration(states_x, states_y, projection="xy"):
-    plt.figure()
+    fig, ax = plt.subplots()
+
+    colors_x = plt.cm.tab10(np.linspace(0, 0.4, len(states_x)))
+    colors_y = plt.cm.tab10(np.linspace(0.5, 0.9, len(states_y)))
 
     match projection:
         case "xy":
-            for i, orbit in enumerate(states_x):
-                plt.plot(orbit[:, 0], orbit[:, 1], color="black", linewidth=0.5)
-                
-                plt.scatter(orbit[[0], 0], orbit[[0],1], marker="s", color="black", label="" if i > 0 else "observer")
+            for i, (orbit, c) in enumerate(zip(states_x, colors_x)):
+                ax.plot(orbit[:, 0], orbit[:, 1], color=c, linewidth=0.5)
+                ax.scatter(orbit[[0], 0], orbit[[0], 1], marker="s", color=c,
+                           label="_nolegend_")
 
-            for i, orbit in enumerate(states_y):
-                plt.plot(orbit[:,0], orbit[:,1], color="black", linewidth=0.5)
-                plt.scatter(orbit[0, 0], orbit[0,1], marker="x", color="black", label= ""if i > 0 else "target")
+            for i, (orbit, c) in enumerate(zip(states_y, colors_y)):
+                ax.plot(orbit[:, 0], orbit[:, 1], color=c, linewidth=0.5)
+                ax.scatter(orbit[0, 0], orbit[0, 1], marker="x", color=c,
+                           label="_nolegend_")
 
+            ax.scatter([], [], marker="s", color="black", label="observer")
+            ax.scatter([], [], marker="x", color="black", label="target")
 
-            plt.xlabel("x (DU)")
-            plt.ylabel("y (DU)")
-
-            
+            ax.set_xlabel("x (DU)")
+            ax.set_ylabel("y (DU)")
 
         case "xz":
-            for orbit in states_x:
-                plt.plot(orbit[:, 0], orbit[:, 2])
+            for i, (orbit, c) in enumerate(zip(states_x, colors_x)):
+                ax.plot(orbit[:, 0], orbit[:, 2], color=c, linewidth=0.5,
+                        label=f"observer {i+1}")
 
-            for orbit in states_y:
-                plt.scatter(orbit[:,0], orbit[:,2])
+            for i, (orbit, c) in enumerate(zip(states_y, colors_y)):
+                ax.plot(orbit[:, 0], orbit[:, 2], color=c, linewidth=0.5,
+                        label=f"target {i+1}")
 
-            plt.xlabel("x (DU)")
-            plt.ylabel("z (DU)")
+            ax.set_xlabel("x (DU)")
+            ax.set_ylabel("z (DU)")
 
         case "yz":
-            for orbit in states_x:
-                plt.plot(orbit[:, 1], orbit[:, 2])
+            for i, (orbit, c) in enumerate(zip(states_x, colors_x)):
+                ax.plot(orbit[:, 1], orbit[:, 2], color=c, linewidth=0.5,
+                        label=f"observer {i+1}")
 
-            for orbit in states_y:
-                plt.scatter(orbit[:,1], orbit[:,2])
+            for i, (orbit, c) in enumerate(zip(states_y, colors_y)):
+                ax.plot(orbit[:, 1], orbit[:, 2], color=c, linewidth=0.5,
+                        label=f"target {i+1}")
 
-            plt.xlabel("y (DU)")
-            plt.ylabel("z (DU)")
+            ax.set_xlabel("y (DU)")
+            ax.set_ylabel("z (DU)")
 
-    plt.legend()
+    ax.legend()
     plt.tight_layout()
     plt.show()
 

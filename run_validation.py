@@ -3,16 +3,16 @@ import rudolfpy as rd
 import numpy as np
 import matplotlib.pyplot as plt
 
-from src.Part3.dynamics import gen_state_history, build_taylor_cr3bp
+from blackboxphaseopt.dynamics import gen_state_history, build_taylor_cr3bp
 
 plt.rcParams.update({'font.size': 14})
 
 # seed 0 gives okay result
-# np.random.seed(100)
+# np.random.seed(0)
 
 
 # read .npz file
-config = np.load("exp7.npz")
+config = np.load("exp8_new.npz")
 
 
 # CR3BP dynamics parameters
@@ -49,6 +49,7 @@ u = u[..., ::slice_factor]
 U = U[..., ::slice_factor]
 
 optimal_phases = config["optimal_observer_phases"]
+print("Optimal observer phases:", optimal_phases)
 initial_state_observer = config["initial_state_observer"]
 initial_state_target = config["initial_state_target"]
 initial_state_target_phases = config["initial_state_target_phases"]

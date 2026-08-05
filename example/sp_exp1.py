@@ -146,16 +146,16 @@ def plot_example():
 
     # Parameters
     A = 1.0        # amplitude
-    mu = 0.0       # mean
+    mu = -3     # mean
     sigma = 1.0    # standard deviation
 
     # Generate x values
     xx = np.linspace(-5, 5, config.n_points)
 
     # Compute Gaussian values
-    weights = A * np.exp(-((xx + 3 - mu)**2) / (2 * sigma**2))
+    weights = A * np.exp(-((xx - mu)**2) / (2 * sigma**2))
 
-    candidates = np.linspace(0.494, 0.496, 22)
+    candidates = np.linspace(0.01, 0.99, 22)
     # candidates = [0.5, 0.498]
     # x_prev = None
 
@@ -205,14 +205,15 @@ def plot_example():
     axes[0].plot(candidates, mean_cost, linewidth=1, alpha=0.2, color='black')
     axes[0].scatter(candidates, mean_cost, cmap='coolwarm', s=15, c=grads, vmin=-max(np.abs(grads)), vmax=max(np.abs(grads)))
     axes[0].set_xlabel(r"$\phi$")
-    axes[0].set_ylabel(r"$\mathrm{Agg}\left(\text{LP}_{t}\right)$")
+    axes[0].set_ylabel(r"$\langle\text{LP}_{t}\rangle$")
     axes[0].set_title("Mean Shortest Path Cost")
     axes[0].grid(True)
+
 
     cbar = plt.colorbar(
         mappable=axes[0].collections[0],
         ax=axes[0],
-        label=r"$\mathrm{Agg}\left(\nabla_{\mathbf{s}}\text{LP}_{t}\right)$"
+        label=r"$\langle\nabla_{\mathbf{s}}\text{LP}_{t}\rangle$"
     )
     cbar.ax.yaxis.set_ticks_position('left')     # ticks on the left
     cbar.ax.yaxis.set_label_position('left') 
@@ -222,14 +223,14 @@ def plot_example():
     axes[ 1].plot(candidates, mean_cost_gauss, linewidth=1, alpha=0.2, color='black')
     axes[ 1].scatter(candidates, mean_cost_gauss, cmap='coolwarm', s=15, c=grads_gauss, vmin=-max(np.abs(grads_gauss)), vmax = max(np.abs(grads_gauss)))
     axes[ 1].set_xlabel(r"$\phi$")
-    axes[ 1].set_ylabel(r"$\mathrm{Agg}\left(\text{LP}_{t}\right)$")
+    axes[ 1].set_ylabel(r"$\langle\text{LP}_{t}\rangle_{\mathcal{N}}$")
     axes[ 1].set_title("Weighted Mean Shortest Path Cost")
     axes[ 1].grid(True)
 
     cbar = plt.colorbar(
         mappable=axes[1].collections[0],
         ax=axes[1],
-        label=r"$\mathrm{Agg}\left(\nabla_{\mathbf{s}}\text{LP}_{t}\right)$"
+        label=r"$\langle\nabla_{\mathbf{s}}\text{LP}_{t}\rangle_{\mathcal{N}}$"
     )
 
     cbar.ax.yaxis.set_ticks_position('left')     # ticks on the left

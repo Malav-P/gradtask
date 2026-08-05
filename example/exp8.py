@@ -1,4 +1,4 @@
-# from root : python3 -m example.exp7
+# from root : python3 -m example.exp8
 
 # note: using computed information (using jax)
 # note: need to clip gradients to avoid large changes in x after one step
@@ -7,7 +7,7 @@
 from blackboxphaseopt.assignment_problem import solve_assignment_problem_time_expanded
 from blackboxphaseopt.dynamics import gen_state_history, build_taylor_cr3bp
 from blackboxphaseopt.gradients import select_gradients, compute_information, compute_projected_gradients
-from blackboxphaseopt.utilities import  angleanglerate_jacobian, jit_vmap_info_metric
+from blackboxphaseopt.utilities import  angleanglerate_jacobian, jit_vmap_info_metric, _get_transformation_matrix, S, e3
 from blackboxphaseopt.optimizers import SGD
 from blackboxphaseopt.constants import Config
 
@@ -19,6 +19,43 @@ import matplotlib.pyplot as plt
 from dataclasses import asdict
 
 plt.rcParams.update({'font.size': 14})
+
+def soft_clip(x, threshold=1000):
+    return threshold * np.tanh(x / threshold)
+
+def optical_jacobian(x, y):
+    """
+    Equation 7a of https://doi.org/10.1007/s40295-025-00520-8.
+    Compute the observation Jacobian matrix H = dh/dx for a given state x and observer y. 
+
+    Args:
+        x (jnp.ndarray): Observer State vector of shape (6,)
+        y (jnp.ndarray): Target state vector of shape (6,)
+    Returns:
+        H (jnp.ndarray): Observation Jacobian matrix of shape (4, 6).
+    """
+    rho = y[:3] - x[:3]
+    nu = y[3:] - x[3:]
+    T_c = _get_transformation_matrix(rho)
+
+    rho_c = T_c @ rho
+    nu_c = T_c @ nu
+
+    # Stabilize division by z
+    z = jnp.where(jnp.abs(rho_c[2]) < 1e-8, 1e-8, rho_c[2])
+
+    A = (S / z) @ (jnp.eye(3) - jnp.outer(rho_c, e3) / z) @ T_c
+    B = (-S / (z**2)) @ (
+        nu_c[2] * jnp.eye(3)
+        + jnp.outer(nu_c, e3)
+        - 2 * (nu_c[2] / z) * jnp.outer(rho_c, e3)
+    ) @ T_c
+
+    H_top = jnp.concatenate([A, jnp.zeros((2,3))], axis=1)
+    H_bottom = jnp.concatenate([B, A], axis=1)
+    H = jnp.concatenate([H_top, H_bottom], axis=0)
+
+    return H
 
 
 if __name__ == "__main__":
@@ -45,7 +82,7 @@ if __name__ == "__main__":
         exp_name = "exp7",
         period = 3.225,
         n_points = 215,
-        max_iters = (1200,),
+        max_iters = (75,),
         initial_state_target = np.tile(initial_state_y, (2, 1)),
         initial_state_target_phases = (0, 0.5),
         initial_state_observer= np.tile(initial_state, (2, 1)),
@@ -60,8 +97,8 @@ if __name__ == "__main__":
 
     ###### OPTICAL MEASUREMENT MODEL ###########
 
-    # R = config.sigma**2 * jnp.block([[jnp.eye(2), jnp.zeros(shape=(2,2))], [jnp.zeros(shape=(2,2)), (2/(config.t_expose**2))*jnp.eye(2)]])
-    # H_func = _get_obs_jacobian
+    # R_func = lambda x, y : config.sigma**2 * jnp.block([[jnp.eye(2), jnp.zeros(shape=(2,2))], [jnp.zeros(shape=(2,2)), (2/(config.t_expose**2))*jnp.eye(2)]])
+    # H_func = optical_jacobian
 
     ########################################################
 
@@ -94,7 +131,7 @@ if __name__ == "__main__":
         obj_history = np.empty(shape=(max_iter,))
         phase_history= np.empty(shape=(max_iter, 2))
 
-        optimizer = SGD(p, modulo=1, momentum=0., lr=0.001, noise=0, cosine_anneal=True, t_max=max_iter, eta_min=1e-4, clip_grad_norm=20)
+        optimizer = SGD(p, modulo=1, momentum=0., lr=0.01, noise=0, cosine_anneal=True, t_max=max_iter, eta_min=1e-4, clip_grad_norm=20)
 
         best_obj = -np.inf
         best_controls = None
@@ -108,6 +145,7 @@ if __name__ == "__main__":
                                     phase=optimizer.parameters)
 
             dist, grad = compute_information(states_x=states_x, states_y=states_y, info_metric=info_metric)  # (n_points, 2, 2) , (n_points, 2, 2, 6)
+            grad = soft_clip(grad, threshold=1000)
 
             grad *= -1  # we want to maximize information
 
@@ -133,7 +171,7 @@ if __name__ == "__main__":
             print("Gradient: ", proj_g, "Objective: ", obj/config.n_points, "New Phases: ", phase, "Number of assignments", x.sum())
 
 
-        # np.savez("exp7_new.npz", u=best_controls, optimal_observer_phases = optimizer.parameters, **asdict(config))
+        # np.savez("exp8_new.npz", u=best_controls, optimal_observer_phases = optimizer.parameters, **asdict(config))
 
 
         plt.figure(0)
@@ -176,6 +214,8 @@ if __name__ == "__main__":
     plt.xlabel("Iteration number")
     plt.ylabel("Grad component sum")
     plt.legend()
+
+    print("figure size", plt.gcf().get_size_inches())
 
 
 

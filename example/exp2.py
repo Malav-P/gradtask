@@ -9,10 +9,82 @@ from blackboxphaseopt.gradients import select_gradients, compute_generalized_dis
 from blackboxphaseopt.optimizers import SGD
 from blackboxphaseopt.constants import CR3BP_MU
 
+import os
 import numpy as np
 import matplotlib.pyplot as plt
 
 plt.rcParams.update({'font.size': 14})
+
+def _safe_path(path):
+    """Return path unchanged if it doesn't exist, otherwise insert _1, _2, … before the extension."""
+    if not os.path.exists(path):
+        return path
+    base, ext = os.path.splitext(path)
+    i = 1
+    while os.path.exists(f"{base}_{i}{ext}"):
+        i += 1
+    return f"{base}_{i}{ext}"
+
+def plot_orbit_snapshots(ta, initial_state, initial_state_y, time_, n_points, all_phase_histories, start_phases):
+    """3-row × 3-col grid: rows = ICs, cols = begin / mid / end iteration."""
+    n_ics = len(start_phases)
+    fig, axes = plt.subplots(n_ics, 3, figsize=(13, 4 * n_ics))
+    if n_ics == 1:
+        axes = axes[np.newaxis, :]
+
+    # Reference orbit traces (phase doesn't change the shape, only the starting point)
+    _, orbit_x = gen_state_history(ta=ta, initial_state=np.tile(initial_state, (2, 1)),
+                                   time=time_, n_points=n_points, phase=(0., 0.5))
+    _, orbit_y = gen_state_history(ta=ta, initial_state=np.tile(initial_state_y, (2, 1)),
+                                   time=time_, n_points=n_points, phase=(0., 0.5))
+
+    obs_colors = ["tab:blue", "tab:orange"]
+    col_labels = ["Beginning", "Middle", "End"]
+
+    for row, (ph_hist, p0) in enumerate(zip(all_phase_histories, start_phases)):
+        max_iter = len(ph_hist)
+        snap_iters = [0, max_iter // 2, max_iter - 1]
+
+        for col, snap_idx in enumerate(snap_iters):
+            ax = axes[row, col]
+            phases = ph_hist[snap_idx]
+
+            _, states_snap = gen_state_history(ta=ta,
+                                               initial_state=np.tile(initial_state, (2, 1)),
+                                               time=time_, n_points=n_points,
+                                               phase=phases)
+
+            # Orbit traces
+            ax.plot(orbit_x[0, :, 0], orbit_x[0, :, 1], color="silver", lw=1, zorder=1)
+            ax.plot(orbit_y[0, :, 0], orbit_y[0, :, 1], color="silver", lw=1, ls="--", zorder=1)
+
+            # Target positions
+            for t_idx in range(orbit_y.shape[0]):
+                ax.scatter(orbit_y[t_idx, 0, 0], orbit_y[t_idx, 0, 1],
+                           marker="x", s=90, color="black", zorder=3,
+                           label="target" if (row == 0 and col == 0 and t_idx == 0) else "")
+
+            # Observer positions
+            for sat_idx in range(states_snap.shape[0]):
+                ax.scatter(states_snap[sat_idx, 0, 0], states_snap[sat_idx, 0, 1],
+                           marker="o", s=80, color=obs_colors[sat_idx], zorder=3,
+                           label=f"obs {sat_idx + 1} ($\\phi$={phases[sat_idx]:.2f})" if row == 0 and col == 0 else
+                                 f"$\\phi$={phases[sat_idx]:.2f}")
+
+            if row == 0:
+                ax.set_title(f"{col_labels[col]}  (iter {snap_idx})")
+            ax.set_xlabel("x (DU)")
+            if col == 0:
+                ax.set_ylabel(f"$\\phi_0$=[{p0[0]:.2f}, {p0[1]:.2f}]\ny (DU)")
+            ax.set_aspect("equal")
+            ax.legend(fontsize=12, loc="lower center")
+
+    # plt.suptitle("Observer Phasing Evolution Along Orbit", fontsize=14)
+    plt.tight_layout()
+    plt.subplots_adjust(hspace=0.35)
+    plt.savefig(_safe_path("media/exp2/phase_snapshots.png"), bbox_inches="tight")
+    plt.show()
+
 
 def plot_configuration(states_x, states_y, projection="xy"):
     plt.figure()
@@ -112,6 +184,8 @@ if __name__ == "__main__":
     }
 
     
+    all_phase_histories = []
+
     for p, max_iter in zip(start_phases, max_iters):
 
         grad_history = np.empty(shape=(max_iter, 2))
@@ -159,17 +233,19 @@ if __name__ == "__main__":
 
             print("Gradient: ", proj_g, "Objective: ", obj/n_points, "New Phases: ", phase, "Number of assignments: ", np.sum(x))
 
+        all_phase_histories.append(phase_history.copy())
+
         plt.figure(0)
-        plt.plot(obj_history, label=f'IC: [{p[0]:.2f}, {p[1]:.2f}]')
+        plt.plot(obj_history, label=f'$\\phi_0$=[{p[0]:.2f}, {p[1]:.2f}]')
 
         plt.figure(1)
-        plt.plot(np.linalg.norm(grad_history, axis=-1), label=f'IC: [{p[0]:.2f}, {p[1]:.2f}]')
+        plt.plot(np.linalg.norm(grad_history, axis=-1), label=f'$\\phi_0$=[{p[0]:.2f}, {p[1]:.2f}]')
 
         plt.figure(2)
-        plt.plot(np.abs(phase_history[:,0] - phase_history[:,1]), label=f'IC: [{p[0]:.2f}, {p[1]:.2f}]')
+        plt.plot(np.abs(phase_history[:,0] - phase_history[:,1]), label=f'$\\phi_0$=[{p[0]:.2f}, {p[1]:.2f}]')
 
         plt.figure(3)
-        plt.plot(np.abs(grad_history[:,0] + grad_history[:,1]), label=f'IC: [{p[0]:.2f}, {p[1]:.2f}]')
+        plt.plot(np.abs(grad_history[:,0] + grad_history[:,1]), label=f'$\\phi_0$=[{p[0]:.2f}, {p[1]:.2f}]')
 
     
     plt.figure(0)
@@ -179,7 +255,7 @@ if __name__ == "__main__":
     plt.grid(True)
     plt.tight_layout()
 
-    plt.savefig("media/exp2/obj.png")
+    plt.savefig(_safe_path("media/exp2/obj.png"))
 
     plt.figure(1)
     plt.xlabel("Iteration number")
@@ -187,7 +263,7 @@ if __name__ == "__main__":
     plt.legend()
     plt.grid(True)
     plt.tight_layout()
-    plt.savefig("media/exp2/gradnorm.png")
+    plt.savefig(_safe_path("media/exp2/gradnorm.png"))
 
     plt.figure(2)
     plt.xlabel("Iteration number")
@@ -195,7 +271,7 @@ if __name__ == "__main__":
     plt.legend()
     plt.grid(True)
     plt.tight_layout()
-    plt.savefig("media/exp2/phasediff.png")
+    plt.savefig(_safe_path("media/exp2/phasediff.png"))
 
     plt.figure(3)
     plt.xlabel("Iteration number")
@@ -203,5 +279,8 @@ if __name__ == "__main__":
     plt.legend()
     plt.grid(True)
     plt.tight_layout()
+
+    plot_orbit_snapshots(ta, initial_state, initial_state_y, time_, n_points,
+                         all_phase_histories, start_phases)
 
     plt.show()
